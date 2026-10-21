@@ -1,0 +1,55 @@
+
+name: Build Uptime Kuma Offline
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Download Uptime Kuma 2.5.4
+        uses: actions/checkout@v4
+        with:
+          repository: louislam/uptime-kuma
+          ref: 2.5.4
+          path: uptime-kuma
+
+      - name: Install Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        working-directory: uptime-kuma
+        shell: pwsh
+        run: |
+          npm ci --omit=dev --no-audit
+          npm run download-dist
+
+      - name: Verify required files
+        shell: pwsh
+        run: |
+          $required = @(
+            "uptime-kuma/server/server.js",
+            "uptime-kuma/node_modules",
+            "uptime-kuma/dist"
+          )
+          foreach ($path in $required) {
+            if (!(Test-Path $path)) {
+              throw "Missing: $path"
+            }
+          }
+
+      - name: Package application
+        shell: pwsh
+        run: |
+          Compress-Archive -Path uptime-kuma `
+            -DestinationPath uptime-kuma-offline.zip
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: uptime-kuma-windows-offline
+          path: uptime-kuma-offline.zip
